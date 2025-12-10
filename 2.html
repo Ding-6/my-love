@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>To My Only One</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;700&family=Pacifico&display=swap" rel="stylesheet">
+  <style>
+    /* =========================================
+       1. CSS Reset & Variables (核心变量)
+       ========================================= */
+    :root {
+      --primary: #ff6b6b;
+      --secondary: #ff9e9e;
+      --accent: #feca57;
+      --dark: #2d3436;
+      --light: #fff;
+      --glass: rgba(255, 255, 255, 0.25);
+      --glass-border: rgba(255, 255, 255, 0.5);
+      --font-main: 'Noto Serif SC', serif;
+      --font-en: 'Pacifico', cursive;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--font-main);
+      background: #1a1a2e;
+      color: var(--dark);
+      overflow-x: hidden;
+    }
+
+    /* 隐藏滚动条但允许滚动 */
+    ::-webkit-scrollbar { width: 0px; background: transparent; }
+
+    /* =========================================
+       2. Background System (动态背景)
+       ========================================= */
+    #canvas-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      background: radial-gradient(circle at bottom, #1a1a2e 0%, #16213e 100%);
+    }
+
+    /* =========================================
+       3. Lock Screen (密码锁屏)
+       ========================================= */
+    #lock-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      color: white;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: transform 1s cubic-bezier(0.77, 0, 0.175, 1);
+    }
+
+    #lock-screen.unlocked { transform: translateY(-100%); }
+
+    .passcode-display {
+      font-size: 2rem;
+      letter-spacing: 1rem;
+      margin-bottom: 1rem;
+      min-height: 3rem;
+    }
+
+    #passcode-error {
+        color: var(--primary);
+        height: 1rem;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+
+    .numpad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      max-width: 300px;
+    }
+
+    .num-btn {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      font-size: 1.5rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .num-btn:active { background: rgba(255,255,255,0.3); }
+
+    /* =========================================
+       4. Main Content & Sections
+       ========================================= */
+    #main-content {
+      opacity: 0;
+      transition: opacity 2s ease 1s;
+    }
+    #main-content.visible { opacity: 1; }
+
+    section {
+      min-height: 100vh;
+      padding: 5rem 2rem;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .section-title {
+        color: white;
+        font-size: 2.5rem;
+        margin-bottom: 4rem;
+        font-family: var(--font-main);
+        font-weight: 700;
+    }
+
+    /* 新增：滚动淡入动画 */
+    .scroll-fade {
+        opacity: 0;
+        transform: translateY(40px);
+        transition: opacity 0.8s cubic-bezier(0.165, 0.84, 0.44, 1), transform 0.8s cubic-bezier(0.165, 0.84, 0.44, 1);
+    }
+    .scroll-fade.visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+
+    /* =========================================
+       5. Hero Section (首页)
+       ========================================= */
+    #s1 { justify-content: center; }
+    .hero-title {
+      font-family: var(--font-en);
+      font-size: clamp(3rem, 12vw, 6rem); /* 响应式字体 */
+      background: linear-gradient(to right, #ff9a9e 0%, #fecfef 99%, #fecfef 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      animation: float 3s ease-in-out infinite;
+      text-align: center;
+    }
+    .hero-subtitle {
+        color: white;
+        margin-top: 20px;
+        font-size: 1.2rem;
+        text-align: center;
+    }
+
+    .scroll-indicator {
+      position: absolute;
+      bottom: 30px;
+      color: rgba(255,255,255,0.5);
+      animation: bounce 2s infinite;
+    }
+
+    /* =========================================
+       6. Chat Simulation (聊天模拟)
+       ========================================= */
+    .chat-container {
+      width: 100%;
+      max-width: 600px;
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 20px;
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 25px 45px rgba(0,0,0,0.1);
+    }
+
+    .message {
+      display: flex;
+      margin-bottom: 20px;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.5s ease;
+    }
+    .message.show { opacity: 1; transform: translateY(0); }
+    .message.left .avatar { margin-right: 15px; }
+    .message.right { flex-direction: row-reverse; }
+    .message.right .avatar { margin-left: 15px; }
+    .avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      background-size: cover; border: 2px solid white;
+      flex-shrink: 0;
+    }
+    .bubble {
+      max-width: 80%;
+      padding: 12px 18px;
+      border-radius: 15px;
+      font-size: 1rem;
+      line-height: 1.5;
+    }
+    .message.left .bubble { background: white; color: #333; border-top-left-radius: 2px; }
+    .message.right .bubble { background: var(--primary); color: white; border-top-right-radius: 2px; }
+
+    /* =========================================
+       7. Timeline (新增：我们的足迹)
+       ========================================= */
+    .timeline-container {
+        width: 100%;
+        max-width: 800px;
+        position: relative;
+        padding: 2rem 0;
+    }
+    .timeline-container::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 2px;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+    .timeline-item {
+        padding: 10px 40px;
+        position: relative;
+        width: 50%;
+    }
+    .timeline-item:nth-child(odd) { left: 0; }
+    .timeline-item:nth-child(even) { left: 50%; }
+    .timeline-item::after {
+        content: '';
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        right: -8px;
+        background-color: white;
+        border: 4px solid var(--primary);
+        top: 28px;
+        border-radius: 50%;
+        z-index: 1;
+    }
+    .timeline-item:nth-child(even)::after { left: -8px; }
+    .timeline-content {
+        padding: 20px 30px;
+        background: rgba(255,255,255,0.1);
+        backdrop-filter: blur(5px);
+        position: relative;
+        border-radius: 6px;
+        color: white;
+    }
+    .timeline-item:nth-child(odd) { text-align: right; }
+    .timeline-content h3 { font-family: var(--font-en); color: var(--accent); }
+    .timeline-content p { font-size: 0.9rem; line-height: 1.6; }
+
+
+    /* =========================================
+       8. Gallery (相册 - 新布局)
+       ========================================= */
+    .gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 2rem;
+        width: 100%;
+        max-width: 1000px;
+        padding: 1rem;
+    }
+    .polaroid {
+        background: white;
+        padding: 15px 15px 50px 15px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    .polaroid:hover {
+        transform: translateY(-10px) rotate(2deg);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    }
+    .polaroid img { width: 100%; height: 200px; object-fit: cover; background: #eee; }
+    .polaroid p { text-align:center; padding-top:10px; color:#666; font-family:var(--font-en); }
+
+
+    /* =========================================
+       9. Music Player & Final Section
+       ========================================= */
+    #music-player {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 50px;
+      height: 50px;
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(5px);
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.3);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      z-index: 1000;
+      overflow: hidden;
+    }
+    .bar { width: 4px; background: var(--primary); margin: 0 2px; border-radius: 2px; animation: equalize 1s infinite; }
+    #music-player.paused .bar { animation-play-state: paused; height: 5px; }
+
+    /* 修改：让最终卡片和按钮居中 */
+    #s5 .scroll-fade {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+    }
+
+    #final-card {
+        background: rgba(255,255,255,0.1);
+        padding: 50px; /* 修改：增大内边距 */
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+        max-width: 800px;
+        width: 100%;
+        text-align: center; /* 修改：文字居中 */
+    }
+    #final-typewriter {
+        font-size: 1.6rem; /* 修改：增大字体 */
+        line-height: 2;
+        color: #fff;
+        min-height: 240px; /* 修改：增大最小高度 */
+    }
+    #final-button {
+        margin-top: 40px; /* 修改：增大间距 */
+        padding: 15px 40px;
+        border-radius: 30px;
+        border:none;
+        background: var(--primary);
+        color: white;
+        font-size: 1.2rem;
+        cursor: pointer;
+        box-shadow: 0 10px 20px rgba(232, 74, 95, 0.4);
+        transition: transform 0.3s ease;
+    }
+    #final-button:hover { transform: scale(1.1); }
+
+    /* 动画 */
+    @keyframes equalize { 0% { height: 10px; } 50% { height: 25px; } 100% { height: 10px; } }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+    @keyframes bounce { 0%, 20%, 50%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-10px); } 60% { transform: translateY(-5px); } }
+
+    /* 响应式调整 */
+    @media (max-width: 768px) {
+        section { padding: 4rem 1rem; }
+        .timeline-container::before { left: 8px; }
+        .timeline-item, .timeline-item:nth-child(even) { width: 100%; left: 0; padding-left: 40px; padding-right: 0; }
+        .timeline-item::after, .timeline-item:nth-child(even)::after { left: 0; }
+        .timeline-item:nth-child(odd) { text-align: left; }
+        #final-card { padding: 30px; }
+        #final-typewriter { font-size: 1.3rem; min-height: 200px; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="canvas-bg"></canvas>
+
+<div id="music-player" class="paused" onclick="toggleMusic()">
+  <div class="bar" style="animation-delay: 0s"></div>
+  <div class="bar" style="animation-delay: 0.2s"></div>
+  <div class="bar" style="animation-delay: 0.4s"></div>
+  <div class="bar" style="animation-delay: 0.1s"></div>
+</div>
+<audio id="bgm" loop>
+  <source src="https://music.163.com/song/media/outer/url?id=1824045033.mp3" type="audio/mpeg">
+</audio>
+
+<div id="lock-screen">
+  <h3>请输入我们相遇的日期 (MMDD)</h3>
+  <p style="font-size: 0.8rem; color: #888;">提示：例如 0520</p>
+  <div class="passcode-display" id="passcode-display"></div>
+  <div id="passcode-error">密码错误，请重试</div>
+  <div class="numpad">
+    <button class="num-btn" onclick="inputNum(1)">1</button>
+    <button class="num-btn" onclick="inputNum(2)">2</button>
+    <button class="num-btn" onclick="inputNum(3)">3</button>
+    <button class="num-btn" onclick="inputNum(4)">4</button>
+    <button class="num-btn" onclick="inputNum(5)">5</button>
+    <button class="num-btn" onclick="inputNum(6)">6</button>
+    <button class="num-btn" onclick="inputNum(7)">7</button>
+    <button class="num-btn" onclick="inputNum(8)">8</button>
+    <button class="num-btn" onclick="inputNum(9)">9</button>
+    <button class="num-btn" onclick="clearNum()">C</button>
+    <button class="num-btn" onclick="inputNum(0)">0</button>
+    <button class="num-btn" style="background: var(--primary)" onclick="checkPass()">→</button>
+  </div>
+</div>
+
+<div id="main-content">
+
+  <section id="s1">
+    <h1 class="hero-title">LOVE U</h1>
+    <p class="hero-subtitle">往后余生，请多指教</p>
+    <div class="scroll-indicator">↓</div>
+  </section>
+
+  <section id="s2">
+    <div class="scroll-fade">
+        <h2 class="section-title">Our Memory</h2>
+        <div class="chat-container" id="chat-box"></div>
+    </div>
+  </section>
+
+  <!-- 新增：时间轴 -->
+  <section id="s3">
+      <div class="scroll-fade">
+          <h2 class="section-title">Our Journey</h2>
+          <div class="timeline-container" id="timeline">
+              <!-- 时间轴内容将由JS动态生成 -->
+          </div>
+      </div>
+  </section>
+
+  <section id="s4">
+    <div class="scroll-fade">
+        <h2 class="section-title">Moments</h2>
+        <div class="gallery-grid" id="gallery">
+          <!-- 相册内容将由JS动态生成 -->
+        </div>
+    </div>
+  </section>
+
+  <section id="s5">
+    <div class="scroll-fade">
+        <div id="final-card">
+            <h2 id="final-typewriter"></h2>
+        </div>
+        <button id="final-button" onclick="rainHearts()">
+          接受心意 ❤️
+        </button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  /* ==================================================================
+     ★☆★☆★  CONFIG: 在这里修改所有个性化内容  ★☆★☆★
+     ================================================================== */
+  const config = {
+    // 1. 密码锁 (4位数字，例如 "0520")
+    passcode: "0520",
+
+    // 2. 聊天记录
+    chatMessages: [
+      { type: 'left', text: '还记得我们第一次见面吗？' },
+      { type: 'right', text: '当然记得，那天阳光正好。' },
+      { type: 'left', text: '从那天起，我的世界多了一束光。' },
+      { type: 'left', text: '我想陪你走过剩下的每一个四季。' },
+      { type: 'right', text: '笨蛋，我也是。' }
+    ],
+
+    // 3. 新增：我们的足迹 (date: 日期, description: 事件描述)
+    timelineEvents: [
+        { date: "2023-05-20", description: "阳光正好，微风不燥，我们初次相遇。" },
+        { date: "2023-06-18", description: "第一次一起看电影，心跳声比电影声更响。" },
+        { date: "2023-10-01", description: "国庆长假，我们踏上了第一次共同的旅程。" },
+        { date: "2024-01-01", description: "在零点的钟声里，我们一起跨年，许下对未来的期盼。" },
+        { date: "Today", description: "故事还在继续，爱也永不止息..." }
+    ],
+
+    // 4. 3D相册 (src: 图片链接, caption: 图片下方的文字)
+    galleryImages: [
+      { src: "https://picsum.photos/200/200?random=1", caption: "First Date" },
+      { src: "https://picsum.photos/200/200?random=2", caption: "Your Smile" },
+      { src: "https://picsum.photos/200/200?random=3", caption: "Travel" },
+      { src: "https://picsum.photos/200/200?random=4", caption: "Our Story" },
+      { src: "https://picsum.photos/200/200?random=5", caption: "Forever" },
+      { src: "https://picsum.photos/200/200?random=6", caption: "With You" }
+    ],
+
+    // 5. 结尾打字机文字 (\n 代表换行)
+    finalText: "我不要短暂的温存，\n我要你一世的陪伴。\n\n代码会过时，\n硬件会老化，\n但爱你的核心逻辑，\n永远不会重构。"
+  };
+
+
+  /* =========================================
+     通用逻辑：页面加载与初始化
+     ========================================= */
+  document.addEventListener('DOMContentLoaded', () => {
+    initGallery();
+    initTimeline();
+    initScrollAnimations();
+  });
+
+  /* =========================================
+     LOGIC 1: 密码锁系统
+     ========================================= */
+  let currentInput = "";
+  const passcodeErrorEl = document.getElementById('passcode-error');
+
+  function inputNum(n) {
+    if (currentInput.length < 4) {
+      currentInput += n;
+      updateDisplay();
+    }
+  }
+
+  function clearNum() {
+    currentInput = "";
+    updateDisplay();
+  }
+
+  function updateDisplay() {
+    const dots = "•".repeat(currentInput.length);
+    document.getElementById('passcode-display').innerText = dots;
+    passcodeErrorEl.style.opacity = '0';
+  }
+
+  function checkPass() {
+    if (currentInput === config.passcode) {
+      document.getElementById('lock-screen').classList.add('unlocked');
+      setTimeout(() => {
+        document.getElementById('main-content').classList.add('visible');
+        toggleMusic();
+        initStarryBackground();
+      }, 500); // 延迟以保证解锁动画流畅
+    } else {
+      passcodeErrorEl.style.opacity = '1';
+      document.getElementById('passcode-display').style.animation = "shake 0.5s";
+      setTimeout(() => {
+        currentInput = "";
+        updateDisplay();
+        document.getElementById('passcode-display').style.animation = "";
+      }, 800);
+    }
+  }
+
+  /* =========================================
+     LOGIC 2: 聊天模拟器
+     ========================================= */
+  async function playChatAnimation() {
+    const chatBox = document.getElementById('chat-box');
+    for (let i = 0; i < config.chatMessages.length; i++) {
+      const msg = config.chatMessages[i];
+      const div = document.createElement('div');
+      div.className = `message ${msg.type}`;
+      // 左右使用不同头像
+      const avatarUrl = msg.type === 'right' ? 'https://picsum.photos/40/40?random=p2' : 'https://picsum.photos/40/40?random=p1';
+      div.innerHTML = `
+          <div class="avatar" style="background-image: url(${avatarUrl})"></div>
+          <div class="bubble">${msg.text}</div>
+      `;
+      chatBox.appendChild(div);
+      await new Promise(r => setTimeout(r, 100));
+      div.classList.add('show');
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  }
+
+  /* =========================================
+     LOGIC 3: 时间轴
+     ========================================= */
+  function initTimeline() {
+    const timelineContainer = document.getElementById('timeline');
+    config.timelineEvents.forEach(event => {
+        const item = document.createElement('div');
+        item.className = 'timeline-item';
+        item.innerHTML = `
+            <div class="timeline-content">
+                <h3>${event.date}</h3>
+                <p>${event.description}</p>
+            </div>
+        `;
+        timelineContainer.appendChild(item);
+    });
+  }
+
+  /* =========================================
+     LOGIC 4: 相册
+     ========================================= */
+  function initGallery() {
+    const gallery = document.getElementById('gallery');
+    gallery.innerHTML = ''; // 清空
+    config.galleryImages.forEach(img => {
+        const polaroid = document.createElement('div');
+        polaroid.className = 'polaroid';
+        polaroid.innerHTML = `
+            <img src="${img.src}" alt="${img.caption}">
+            <p>${img.caption}</p>
+        `;
+        gallery.appendChild(polaroid);
+    });
+  }
+
+  /* =========================================
+     LOGIC 5: 星空背景
+     ========================================= */
+  function initStarryBackground() {
+    const canvas = document.getElementById('canvas-bg');
+    const ctx = canvas.getContext('2d');
+    let width, height, stars = [];
+    const starCount = window.innerWidth > 768 ? 150 : 70; // 根据屏幕宽度调整星星数量
+
+    function resize() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    class Star {
+      constructor() { this.reset(); }
+      reset() {
+        this.x = Math.random() * width;
+        this.y = Math.random() * height;
+        this.size = Math.random() * 1.5 + 0.5;
+        this.speedX = Math.random() * 0.4 - 0.2;
+        this.speedY = Math.random() * 0.4 - 0.2;
+      }
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        if (this.x < 0 || this.x > width || this.y < 0 || this.y > height) {
+            this.reset();
+        }
+      }
+      draw() {
+        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function init() {
+      resize();
+      for (let i = 0; i < starCount; i++) { stars.push(new Star()); }
+      animate();
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, width, height);
+      stars.forEach(star => { star.update(); star.draw(); });
+      requestAnimationFrame(animate);
+    }
+
+    window.addEventListener('resize', resize);
+    init();
+  }
+
+  /* =========================================
+     LOGIC 6: 音乐与打字机
+     ========================================= */
+  const bgm = document.getElementById('bgm');
+  const musicBtn = document.getElementById('music-player');
+
+  function toggleMusic() {
+    if (bgm.paused) {
+      bgm.play().catch(e => console.log("音乐播放失败:", e));
+      musicBtn.classList.remove('paused');
+    } else {
+      bgm.pause();
+      musicBtn.classList.add('paused');
+    }
+  }
+
+  function startTyping() {
+      const text = config.finalText;
+      let i = 0;
+      const el = document.getElementById('final-typewriter');
+      el.innerHTML = '';
+      function type() {
+        if (i < text.length) {
+          el.innerHTML += text.charAt(i) === '\n' ? '<br>' : text.charAt(i);
+          i++;
+          setTimeout(type, 120);
+        }
+      }
+      type();
+  }
+
+  /* =========================================
+     LOGIC 7: 滚动动画
+     ========================================= */
+  function initScrollAnimations() {
+      const observer = new IntersectionObserver((entries, obs) => {
+          entries.forEach(entry => {
+              if (entry.isIntersecting) {
+                  entry.target.classList.add('visible');
+
+                  // 特殊处理的动画触发
+                  const targetId = entry.target.id || entry.target.parentElement.id || entry.target.parentElement.parentElement.id;
+                  if (targetId === 's2' && !entry.target.dataset.chatStarted) {
+                      playChatAnimation();
+                      entry.target.dataset.chatStarted = "true"; // 防止重复触发
+                  }
+                  if (targetId === 's5' && !entry.target.dataset.typingStarted) {
+                      startTyping();
+                      entry.target.dataset.typingStarted = "true";
+                  }
+
+                  // 动画触发后可以取消观察，以提升性能
+                  // obs.unobserve(entry.target);
+              }
+          });
+      }, { threshold: 0.2 }); // 元素进入视口20%时触发
+
+      document.querySelectorAll('.scroll-fade').forEach(el => {
+          observer.observe(el);
+      });
+  }
+
+
+  /* =========================================
+     LOGIC 8: 心形雨特效
+     ========================================= */
+  function rainHearts() {
+    const heartCanvas = document.createElement('canvas');
+    heartCanvas.style.position = 'fixed';
+    heartCanvas.style.top = '0';
+    heartCanvas.style.left = '0';
+    heartCanvas.style.width = '100%';
+    heartCanvas.style.height = '100%';
+    heartCanvas.style.pointerEvents = 'none';
+    heartCanvas.style.zIndex = '9999';
+    document.body.appendChild(heartCanvas);
+
+    const ctx = heartCanvas.getContext('2d');
+    heartCanvas.width = window.innerWidth;
+    heartCanvas.height = window.innerHeight;
+    let hearts = [];
+
+    for(let i=0; i<50; i++) {
+      hearts.push({
+        x: Math.random() * heartCanvas.width,
+        y: Math.random() * heartCanvas.height - heartCanvas.height,
+        speed: Math.random() * 3 + 2,
+        size: Math.random() * 20 + 10,
+        color: `rgba(232, 74, 95, ${Math.random() * 0.5 + 0.5})`
+      });
+    }
+
+    let animationFrameId;
+    function draw() {
+      ctx.clearRect(0,0,heartCanvas.width, heartCanvas.height);
+      hearts.forEach(h => {
+        ctx.font = `${h.size}px serif`;
+        ctx.fillStyle = h.color;
+        ctx.fillText('❤️', h.x, h.y);
+        h.y += h.speed;
+        if (h.y > heartCanvas.height + 20) h.y = -20;
+      });
+      animationFrameId = requestAnimationFrame(draw);
+    }
+    draw();
+    alert("爱你直到永远！(动画已启动)");
+
+    // 15秒后自动移除canvas，避免一直消耗性能
+    setTimeout(() => {
+        cancelAnimationFrame(animationFrameId);
+        document.body.removeChild(heartCanvas);
+    }, 15000);
+  }
+
+  // 添加CSS抖动动画
+  const styleSheet = document.createElement("style");
+  styleSheet.innerText = `@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 50% { transform: translateX(10px); } 75% { transform: translateX(-10px); } }`;
+  document.head.appendChild(styleSheet);
+</script>
+
+<!--
+==================================================================
+   ★☆★ 如何分享此页面 (生成公开链接) ★☆★
+==================================================================
+
+您好！直接发送本地文件（如 C:/.../2.html）是无法让朋友在微信上打开的。
+您需要将这个文件“部署”到互联网上。这里提供一个最简单、完全免费的方法：使用 GitHub Pages。
+
+【第一步：拥有一个 GitHub 账号】
+1. 如果您没有，请访问 https://github.com/ 注册一个。
+
+【第二步：创建一个新的代码仓库 (Repository)】
+1. 登录后，点击页面右上角的“+”号，选择 "New repository"。
+2. 给您的仓库起一个名字，例如 "my-love-page"。
+3. 仓库类型选择 "Public" (公开)。
+4. 点击 "Create repository"。
+
+【第三步：上传您的 HTML 文件】
+1. 进入您刚创建的仓库页面。
+2. 点击 "Add file"，然后选择 "Upload files"。
+3. 将您的 `2.html` 文件拖拽到上传区域。
+4. 在下方的提交信息（Commit changes）处，可以直接点击绿色的 "Commit changes" 按钮。
+
+【第四步：启用 GitHub Pages 并获取链接】
+1. 在您的仓库页面，点击上方的 "Settings" (设置) 选项卡。
+2. 在左侧菜单中，找到并点击 "Pages"。
+3. 在 "Branch" 部分，将下拉菜单从 "None" 改为 "main" (或者您的主分支名)。
+4. 点击 "Save" (保存)。
+5. 页面会刷新，并提示 "Your site is live at: [您的链接]"。链接通常是 `https://您的用户名.github.io/您的仓库名/2.html`。
+   （注意：初次部署可能需要等待1-5分钟才能生效。）
+
+【第五步：分享链接】
+现在，您可以将这个生成的 `https://...` 链接分享给任何人，他们都可以在手机或电脑上打开了！
+
+祝您和您的另一半幸福美满！
+==================================================================
+-->
+
+</body>
+</html>
