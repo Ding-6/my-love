@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>To My Only One</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;700&family=Pacifico&display=swap" rel="stylesheet">
+  <style>
+    /* =========================================
+       1. CSS Reset & Core Styles
+       ========================================= */
+    :root {
+      --primary: #ff6b6b; --secondary: #ff9e9e; --accent: #feca57;
+      --dark: #2d3436; --light: #fff; --glass: rgba(255, 255, 255, 0.25);
+      --glass-border: rgba(255, 255, 255, 0.5); --font-main: 'Noto Serif SC', serif;
+      --font-en: 'Pacifico', cursive;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; width: 100%; overflow: hidden; font-family: var(--font-main); background: #1a1a2e; }
+
+    /* =========================================
+       2. Canvases & Music Player
+       ========================================= */
+    .fullscreen-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+    #petal-canvas { z-index: 999; }
+    #canvas-bg { z-index: -2; background: radial-gradient(circle at bottom, #1a1a2e 0%, #16213e 100%); }
+    #music-player {
+      position: fixed; top: 20px; right: 20px; width: 50px; height: 50px;
+      background: var(--glass); backdrop-filter: blur(5px); border-radius: 50%;
+      border: 1px solid var(--glass-border); display: flex; justify-content: center;
+      align-items: center; cursor: pointer; z-index: 1001; overflow: hidden;
+    }
+    .bar { width: 4px; background: var(--primary); margin: 0 2px; border-radius: 2px; animation: equalize 1s infinite; }
+    #music-player.paused .bar { animation-play-state: paused; height: 5px; }
+
+    /* =========================================
+       3. Lock Screen
+       ========================================= */
+    #lock-screen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; color: white; z-index: 9998;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: opacity 1s ease, visibility 1s;
+      background-image: url('https://images.unsplash.com/photo-1502680390402-4399557f5149?q=80&w=2070&auto=format&fit=crop');
+      background-size: cover; background-position: center;
+    }
+    #lock-screen::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); }
+    #lock-screen > * { z-index: 1; }
+    #lock-screen.unlocked { opacity: 0; visibility: hidden; pointer-events: none; }
+    .passcode-display { font-size: 2rem; letter-spacing: 1rem; margin-bottom: 1rem; min-height: 3rem; }
+    #passcode-error { color: var(--primary); height: 1rem; margin-bottom: 1rem; font-size: 0.9rem; opacity: 0; transition: opacity 0.3s; }
+    .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; max-width: 300px; }
+    .num-btn {
+      width: 70px; height: 70px; border-radius: 50%; background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2); color: white; font-size: 1.5rem; cursor: pointer; transition: background 0.2s;
+      backdrop-filter: blur(3px);
+    }
+    .num-btn:active { background: rgba(255,255,255,0.3); }
+
+    /* =========================================
+       4. Page Turning System
+       ========================================= */
+    #page-container { position: relative; width: 100%; height: 100%; opacity: 0; transition: opacity 1s ease 0.5s; }
+    #page-container.visible { opacity: 1; }
+    .page {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 2rem; color: white;
+      transition: transform 1.2s cubic-bezier(0.86, 0, 0.07, 1), opacity 1.2s cubic-bezier(0.86, 0, 0.07, 1);
+      transform: translateY(100%); opacity: 0;
+    }
+    .page.active { transform: translateY(0); opacity: 1; z-index: 1; }
+    .page.previous { transform: translateY(-100%); opacity: 0; z-index: 0; }
+    #page-nav { position: fixed; right: 30px; top: 50%; transform: translateY(-50%); z-index: 1000; display: none; }
+    .nav-arrow {
+      width: 50px; height: 50px; border: 1px solid rgba(255,255,255,0.3); border-radius: 50%;
+      margin: 20px 0; display: flex; justify-content: center; align-items: center;
+      cursor: pointer; transition: background 0.3s; font-size: 1.5rem; color: white;
+    }
+    .nav-arrow:hover { background: rgba(255,255,255,0.1); }
+    .nav-arrow.hidden { opacity: 0; pointer-events: none; }
+
+    /* =========================================
+       5. Page Content Styles
+       ========================================= */
+    .section-title { font-size: clamp(2rem, 8vw, 2.5rem); margin-bottom: 3rem; font-weight: 700; text-align: center; }
+    .hero-title {
+      font-family: var(--font-en); font-size: clamp(3.5rem, 15vw, 6rem);
+      background: linear-gradient(to right, #ff9a9e 0%, #fecfef 99%, #fecfef 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      text-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: float 3s ease-in-out infinite; text-align: center;
+    }
+    .hero-subtitle { margin-top: 20px; font-size: clamp(1rem, 4vw, 1.2rem); text-align: center; }
+    .chat-container {
+      width: 100%; max-width: 600px; background: var(--glass); backdrop-filter: blur(10px);
+      border-radius: 20px; padding: 20px; border: 1px solid var(--glass-border); box-shadow: 0 25px 45px rgba(0,0,0,0.1);
+    }
+    .message { display: flex; margin-bottom: 20px; opacity: 0; transform: translateY(20px); transition: all 0.5s ease; }
+    .message.show { opacity: 1; transform: translateY(0); }
+    .message.left .avatar { margin-right: 15px; } .message.right { flex-direction: row-reverse; } .message.right .avatar { margin-left: 15px; }
+    .avatar { width: 40px; height: 40px; border-radius: 50%; background-size: cover; border: 2px solid white; flex-shrink: 0; }
+    .bubble { max-width: 80%; padding: 12px 18px; border-radius: 15px; font-size: 1rem; line-height: 1.5; }
+    .message.left .bubble { background: white; color: #333; border-top-left-radius: 2px; }
+    .message.right .bubble { background: var(--primary); color: white; border-top-right-radius: 2px; }
+
+    #s3 .scrollable-content { height: 70vh; width: 100%; overflow-y: auto; padding-right: 15px; }
+    #s3 .scrollable-content::-webkit-scrollbar { width: 4px; }
+    #s3 .scrollable-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 2px; }
+    .timeline-container { width: 100%; max-width: 800px; position: relative; padding: 2rem 0; margin: 0 auto; }
+    .timeline-container::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 2px; height: 100%; background-color: rgba(255, 255, 255, 0.2); }
+    .timeline-item { padding: 10px 40px; position: relative; width: 50%; opacity: 0; transform: translateY(20px); transition: all 0.5s ease; }
+    .timeline-item.show { opacity: 1; transform: translateY(0); }
+    .timeline-item:nth-child(odd) { left: 0; text-align: right; } .timeline-item:nth-child(even) { left: 50%; }
+    .timeline-item::after { content: ''; position: absolute; width: 16px; height: 16px; right: -8px; background-color: white; border: 4px solid var(--primary); top: 28px; border-radius: 50%; z-index: 1; }
+    .timeline-item:nth-child(even)::after { left: -8px; }
+    .timeline-content { padding: 20px 30px; background: var(--glass); backdrop-filter: blur(5px); position: relative; border-radius: 6px; }
+    .timeline-content h3 { font-family: var(--font-en); color: var(--accent); } .timeline-content p { font-size: 0.9rem; line-height: 1.6; }
+
+    /* =========================================
+       6. Paginated Gallery (相册改造)
+       ========================================= */
+    #gallery-wrapper { width: 100%; max-width: 1000px; padding: 0 1rem; }
+    .gallery-container { overflow: hidden; position: relative; }
+    .gallery-slider { display: flex; transition: transform 0.6s ease-in-out; }
+    .gallery-page {
+        width: 100%;
+        flex-shrink: 0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr); /* 桌面端3列 */
+        gap: 1.5rem;
+        padding: 1rem 4rem; /* 为箭头留出空间 */
+    }
+    .polaroid { background: white; padding: 10px 10px 40px 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); transition: all 0.3s ease; cursor: pointer; color: var(--dark); }
+    .polaroid:hover { transform: translateY(-10px) rotate(2deg); box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+    .polaroid img { width: 100%; height: 180px; object-fit: cover; background: #eee; }
+    .polaroid p { text-align:center; padding-top:10px; font-family:var(--font-en); }
+    .gallery-nav { position: absolute; top: 50%; width: 100%; left: 0; display: flex; justify-content: space-between; transform: translateY(-50%); }
+    .gallery-arrow {
+        background: rgba(0,0,0,0.2); border-radius: 50%; width: 40px; height: 40px;
+        color: white; font-size: 1.5rem; display: flex; align-items: center; justify-content: center;
+        cursor: pointer; transition: background 0.3s;
+    }
+    .gallery-arrow:hover { background: rgba(0,0,0,0.4); }
+    .gallery-arrow.hidden { opacity: 0; pointer-events: none; }
+    .gallery-dots { text-align: center; margin-top: 1.5rem; }
+    .dot { width: 10px; height: 10px; background: rgba(255,255,255,0.3); border-radius: 50%; display: inline-block; margin: 0 5px; cursor: pointer; transition: background 0.3s; }
+    .dot.active { background: white; }
+
+    /* =========================================
+       7. Final Page & Animations
+       ========================================= */
+    #final-card { display: flex; flex-direction: column; align-items: center; background: var(--glass); padding: 50px; border-radius: 20px; backdrop-filter: blur(10px); max-width: 800px; width: 100%; text-align: center; }
+    #final-typewriter { font-size: 1.6rem; line-height: 2; min-height: 240px; }
+    #final-button { margin-top: 40px; padding: 15px 40px; border-radius: 30px; border:none; background: var(--primary); color: white; font-size: 1.2rem; cursor: pointer; box-shadow: 0 10px 20px rgba(232, 74, 95, 0.4); transition: transform 0.3s ease; }
+    #final-button:hover { transform: scale(1.1); }
+    @keyframes equalize { 0% { height: 10px; } 50% { height: 25px; } 100% { height: 10px; } }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+
+    /* =========================================
+       8. Mobile Responsiveness
+       ========================================= */
+    @media (max-width: 768px) {
+        .page { padding: 1rem; }
+        #page-nav { right: 5px; } .nav-arrow { width: 40px; height: 40px; margin: 15px 0; }
+        .timeline-container::before { left: 8px; }
+        .timeline-item, .timeline-item:nth-child(even) { width: 100%; left: 0; padding-left: 40px; padding-right: 0; }
+        .timeline-item::after, .timeline-item:nth-child(even)::after { left: 0; }
+        .timeline-item:nth-child(odd) { text-align: left; }
+        .gallery-page { grid-template-columns: repeat(2, 1fr); gap: 1rem; padding: 1rem; } /* 手机端2列 */
+        .polaroid img { height: 140px; }
+        .gallery-nav { display: none; } /* 手机上隐藏左右箭头，只用小圆点 */
+        #final-card { padding: 30px; } #final-typewriter { font-size: 1.3rem; min-height: 200px; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="petal-canvas" class="fullscreen-canvas"></canvas>
+<canvas id="canvas-bg" class="fullscreen-canvas"></canvas>
+<div id="music-player" class="paused" onclick="toggleMusic()">
+  <div class="bar" style="animation-delay: 0s"></div><div class="bar" style="animation-delay: 0.2s"></div>
+  <div class="bar" style="animation-delay: 0.4s"></div><div class="bar" style="animation-delay: 0.1s"></div>
+</div>
+<audio id="bgm" loop><source src="https://pjmp3.de/song.php?id=7149583" type="audio/mpeg"></audio>
+
+<div id="lock-screen">
+  <h3>请输入我们相遇的日期 (MMDD)</h3>
+  <p style="font-size: 0.8rem; color: #888;">提示：例如 0520</p>
+  <div class="passcode-display" id="passcode-display"></div>
+  <div id="passcode-error">密码错误，请重试</div>
+  <div class="numpad">
+    <button class="num-btn" onclick="inputNum(1)">1</button> <button class="num-btn" onclick="inputNum(2)">2</button> <button class="num-btn" onclick="inputNum(3)">3</button>
+    <button class="num-btn" onclick="inputNum(4)">4</button> <button class="num-btn" onclick="inputNum(5)">5</button> <button class="num-btn" onclick="inputNum(6)">6</button>
+    <button class="num-btn" onclick="inputNum(7)">7</button> <button class="num-btn" onclick="inputNum(8)">8</button> <button class="num-btn" onclick="inputNum(9)">9</button>
+    <button class="num-btn" onclick="clearNum()">C</button> <button class="num-btn" onclick="inputNum(0)">0</button> <button class="num-btn" style="background: var(--primary)" onclick="checkPass()">→</button>
+  </div>
+</div>
+
+<div id="page-container">
+  <section id="s1" class="page">
+    <h1 class="hero-title">LOVE U</h1>
+    <p class="hero-subtitle">往后余生，请多指教</p>
+  </section>
+
+  <section id="s2" class="page">
+    <div>
+        <h2 class="section-title">Our Memory</h2>
+        <div class="chat-container" id="chat-box"></div>
+    </div>
+  </section>
+
+  <section id="s3" class="page">
+      <div>
+          <h2 class="section-title">Our Journey</h2>
+          <div class="scrollable-content">
+            <div class="timeline-container" id="timeline"></div>
+          </div>
+      </div>
+  </section>
+
+  <section id="s4" class="page">
+    <div id="gallery-wrapper">
+        <h2 class="section-title">Moments</h2>
+        <div class="gallery-container">
+            <div class="gallery-slider" id="gallery-slider"></div>
+            <div class="gallery-nav">
+                <div class="gallery-arrow" id="gallery-prev">‹</div>
+                <div class="gallery-arrow" id="gallery-next">›</div>
+            </div>
+        </div>
+        <div class="gallery-dots" id="gallery-dots"></div>
+    </div>
+  </section>
+
+  <section id="s5" class="page">
+    <div id="final-card">
+        <h2 id="final-typewriter"></h2>
+        <button id="final-button" onclick="triggerFinalAnimation()">接受心意</button>
+    </div>
+  </section>
+</div>
+
+<div id="page-nav">
+    <div class="nav-arrow" id="nav-up">↑</div>
+    <div class="nav-arrow" id="nav-down">↓</div>
+</div>
+
+<script>
+  /* ==================================================================
+     ★☆★☆★  CONFIG: 在这里修改所有个性化内容  ★☆★☆★
+     ================================================================== */
+  const config = {
+    passcode: "0520",
+    chatMessages: [
+      { type: 'left', text: '还记得我们第一次见面吗？' }, { type: 'right', text: '当然记得，那天阳光正好。' },
+      { type: 'left', text: '从那天起，我的世界多了一束光。' }, { type: 'left', text: '我想陪你走过剩下的每一个四季。' },
+      { type: 'right', text: '笨蛋，我也是。' }
+    ],
+    timelineEvents: [
+        { date: "2023-05-20", description: "阳光正好，微风不燥，我们初次相遇。" },
+        { date: "2023-06-18", description: "第一次一起看电影，心跳声比电影声更响。" },
+        { date: "2023-10-01", description: "国庆长假，我们踏上了第一次共同的旅程。" },
+        { date: "2024-01-01", description: "在零点的钟声里，我们一起跨年，许下对未来的期盼。" },
+        { date: "2024-02-14", description: "第一个情人节，玫瑰和巧克力都比不上你的微笑。" },
+        { date: "Today", description: "故事还在继续，爱也永不止息..." }
+    ],
+    // 增加更多图片以测试相册翻页
+    galleryImages: [
+      { src: "https://picsum.photos/200/200?random=1", caption: "First Date" }, { src: "https://picsum.photos/200/200?random=2", caption: "Your Smile" },
+      { src: "https://picsum.photos/200/200?random=3", caption: "Travel" }, { src: "https://picsum.photos/200/200?random=4", caption: "Our Story" },
+      { src: "https://picsum.photos/200/200?random=5", caption: "Forever" }, { src: "https://picsum.photos/200/200?random=6", caption: "With You" },
+      { src: "https://picsum.photos/200/200?random=7", caption: "Sunset" }, { src: "https://picsum.photos/200/200?random=8", caption: "Morning" },
+      { src: "https://picsum.photos/200/200?random=9", caption: "Coffee Time" }, { src: "https://picsum.photos/200/200?random=10", caption: "Little Things" }
+    ],
+    finalText: "我不要短暂的温存，\n我要你一世的陪伴。\n\n代码会过时，\n硬件会老化，\n但爱你的核心逻辑，\n永远不会重构。",
+    blessings: ["永远爱你", "Happy Everyday", "不止今天，还有明天", "岁岁年年，万喜万般宜", "You are my sunshine"]
+  };
+
+  /* =========================================
+     Initialization
+     ========================================= */
+  document.addEventListener('DOMContentLoaded', () => {
+    initPetalAnimation();
+    initGallery();
+    initTimeline();
+    initPageTurning();
+  });
+
+  /* =========================================
+     LOGIC 1: 密码锁 & 全局花瓣动画
+     ========================================= */
+  let currentInput = "";
+  function initPetalAnimation() {
+      const canvas = document.getElementById('petal-canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+      const particles = Array.from({length: 30}, () => ({
+          x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+          size: Math.random() * 5 + 2, speed: Math.random() * 0.5 + 0.2,
+          char: '🌸'
+      }));
+      function draw() {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          particles.forEach(p => {
+              ctx.font = `${p.size * 5}px serif`; ctx.globalAlpha = 0.6;
+              ctx.fillText(p.char, p.x, p.y); p.y += p.speed;
+              if (p.y > canvas.height) { p.x = Math.random() * canvas.width; p.y = -20; }
+          });
+          requestAnimationFrame(draw);
+      }
+      window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+      draw();
+  }
+  function inputNum(n) { if (currentInput.length < 4) { currentInput += n; updateDisplay(); } }
+  function clearNum() { currentInput = ""; updateDisplay(); }
+  function updateDisplay() {
+    document.getElementById('passcode-display').innerText = "•".repeat(currentInput.length);
+    document.getElementById('passcode-error').style.opacity = '0';
+  }
+  function checkPass() {
+    if (currentInput === config.passcode) {
+      document.getElementById('lock-screen').classList.add('unlocked');
+      setTimeout(() => {
+        document.getElementById('page-container').classList.add('visible');
+        document.getElementById('page-nav').style.display = 'block';
+        toggleMusic();
+        initStarryBackground();
+        showPage(0);
+      }, 1000);
+    } else {
+      document.getElementById('passcode-error').style.opacity = '1';
+      document.getElementById('passcode-display').style.animation = "shake 0.5s";
+      setTimeout(() => { currentInput = ""; updateDisplay(); document.getElementById('passcode-display').style.animation = ""; }, 800);
+    }
+  }
+
+  /* =========================================
+     LOGIC 2: 翻页系统 & 交互优化
+     ========================================= */
+  let currentPageIndex = -1, pages = [], isThrottled = false;
+  function initPageTurning() {
+    pages = document.querySelectorAll('.page');
+    document.getElementById('nav-up').addEventListener('click', () => showPage(currentPageIndex - 1));
+    document.getElementById('nav-down').addEventListener('click', () => showPage(currentPageIndex + 1));
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    // 阻止在可滚动/可交互内容上翻页
+    document.querySelector('#s3 .scrollable-content').addEventListener('wheel', e => e.stopPropagation());
+    document.getElementById('gallery-wrapper').addEventListener('wheel', e => e.stopPropagation());
+  }
+  function handleWheel(event) {
+      event.preventDefault();
+      if (isThrottled) return;
+      isThrottled = true;
+      setTimeout(() => { isThrottled = false; }, 1500);
+      showPage(currentPageIndex + (event.deltaY > 0 ? 1 : -1));
+  }
+  function showPage(index) {
+    if (index < 0 || index >= pages.length || index === currentPageIndex) return;
+    pages.forEach((page, i) => {
+        page.classList.remove('active', 'previous');
+        if (i === index) page.classList.add('active');
+        else if (i === currentPageIndex) page.classList.add('previous');
+    });
+    currentPageIndex = index;
+    updateNavButtons();
+    triggerPageAnimation(index);
+  }
+  function updateNavButtons() {
+    document.getElementById('nav-up').classList.toggle('hidden', currentPageIndex === 0);
+    document.getElementById('nav-down').classList.toggle('hidden', currentPageIndex === pages.length - 1);
+  }
+
+  /* =========================================
+     LOGIC 3: 页面专属动画触发
+     ========================================= */
+  function triggerPageAnimation(index) {
+    const page = pages[index];
+    if (page.dataset.animationTriggered) return;
+    setTimeout(() => {
+        switch(page.id) {
+            case 's2': playChatAnimation(); break;
+            case 's3': playTimelineAnimation(); break;
+            case 's5': startTyping(); break;
+        }
+        page.dataset.animationTriggered = "true";
+    }, 800);
+  }
+  async function playChatAnimation() {
+    const chatBox = document.getElementById('chat-box'); chatBox.innerHTML = '';
+    for (const msg of config.chatMessages) {
+      const div = document.createElement('div'); div.className = `message ${msg.type}`;
+      const avatarUrl = msg.type === 'right' ? 'https://picsum.photos/40/40?random=p2' : 'https://picsum.photos/40/40?random=p1';
+      div.innerHTML = `<div class="avatar" style="background-image: url(${avatarUrl})"></div><div class="bubble">${msg.text}</div>`;
+      chatBox.appendChild(div);
+      await new Promise(r => setTimeout(r, 100)); div.classList.add('show');
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  }
+  async function playTimelineAnimation() {
+      for (const item of document.querySelectorAll('.timeline-item')) {
+          item.classList.add('show'); await new Promise(r => setTimeout(r, 300));
+      }
+  }
+  function startTyping() {
+      const text = config.finalText; let i = 0; const el = document.getElementById('final-typewriter'); el.innerHTML = '';
+      function type() { if (i < text.length) { el.innerHTML += text.charAt(i) === '\n' ? '<br>' : text.charAt(i); i++; setTimeout(type, 120); } }
+      type();
+  }
+
+  /* =========================================
+     LOGIC 4: 内容初始化 (Timeline, Paginated Gallery)
+     ========================================= */
+  function initTimeline() {
+    const timelineContainer = document.getElementById('timeline'); timelineContainer.innerHTML = '';
+    config.timelineEvents.forEach(event => {
+        const item = document.createElement('div'); item.className = 'timeline-item';
+        item.innerHTML = `<div class="timeline-content"><h3>${event.date}</h3><p>${event.description}</p></div>`;
+        timelineContainer.appendChild(item);
+    });
+  }
+
+  let currentGalleryPage = 0;
+  let galleryPageCount = 0;
+  function initGallery() {
+    const slider = document.getElementById('gallery-slider');
+    const dotsContainer = document.getElementById('gallery-dots');
+    slider.innerHTML = '';
+    dotsContainer.innerHTML = '';
+
+    const photosPerPage = window.innerWidth > 768 ? 6 : 4;
+    galleryPageCount = Math.ceil(config.galleryImages.length / photosPerPage);
+
+    for (let i = 0; i < galleryPageCount; i++) {
+        const page = document.createElement('div');
+        page.className = 'gallery-page';
+        const pagePhotos = config.galleryImages.slice(i * photosPerPage, (i + 1) * photosPerPage);
+        pagePhotos.forEach(img => {
+            const polaroid = document.createElement('div');
+            polaroid.className = 'polaroid';
+            polaroid.innerHTML = `<img src="${img.src}" alt="${img.caption}"><p>${img.caption}</p>`;
+            page.appendChild(polaroid);
+        });
+        slider.appendChild(page);
+
+        const dot = document.createElement('div');
+        dot.className = 'dot';
+        dot.addEventListener('click', () => showGalleryPage(i));
+        dotsContainer.appendChild(dot);
+    }
+
+    document.getElementById('gallery-prev').addEventListener('click', () => showGalleryPage(currentGalleryPage - 1));
+    document.getElementById('gallery-next').addEventListener('click', () => showGalleryPage(currentGalleryPage + 1));
+
+    showGalleryPage(0);
+  }
+
+  function showGalleryPage(index) {
+      if (index < 0 || index >= galleryPageCount) return;
+
+      const slider = document.getElementById('gallery-slider');
+      slider.style.transform = `translateX(-${index * 100}%)`;
+      currentGalleryPage = index;
+
+      document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === index));
+      document.getElementById('gallery-prev').classList.toggle('hidden', index === 0);
+      document.getElementById('gallery-next').classList.toggle('hidden', index === galleryPageCount - 1);
+  }
+
+
+  /* =========================================
+     LOGIC 5: 背景 & 特效
+     ========================================= */
+  function initStarryBackground() {
+    const canvas = document.getElementById('canvas-bg'), ctx = canvas.getContext('2d');
+    let width, height, stars = [], meteors = [];
+    const starCount = window.innerWidth > 768 ? 200 : 100;
+    function resize() { width = window.innerWidth; height = window.innerHeight; canvas.width = width; canvas.height = height; }
+    class Star {
+      constructor() { this.reset(); }
+      reset() {
+        this.x = Math.random() * width; this.y = Math.random() * height; this.size = Math.random() * 1.5 + 0.5;
+        this.speedX = Math.random() * 0.2 - 0.1; this.speedY = Math.random() * 0.2 - 0.1;
+        this.opacity = Math.random() * 0.5 + 0.3; this.opacityDir = 1;
+      }
+      update() {
+        this.x += this.speedX; this.y += this.speedY;
+        if (this.opacity > 0.8 || this.opacity < 0.2) this.opacityDir *= -1;
+        this.opacity += this.opacityDir * 0.005;
+        if (this.x < 0 || this.x > width || this.y < 0 || this.y > height) this.reset();
+      }
+      draw() { ctx.fillStyle = `rgba(255, 255, 255, ${this.opacity})`; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); }
+    }
+    class Meteor {
+        constructor() { this.reset(); }
+        reset() { this.x = Math.random() * width * 1.5; this.y = -10; this.len = Math.random() * 150 + 50; this.speed = Math.random() * 8 + 5; }
+        update() { this.x -= this.speed; this.y += this.speed; if (this.x < -this.len || this.y > height + this.len) this.reset(); }
+        draw() {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 2; ctx.beginPath();
+            ctx.moveTo(this.x, this.y); ctx.lineTo(this.x + this.len, this.y - this.len); ctx.stroke();
+        }
+    }
+    function init() {
+      resize();
+      for (let i = 0; i < starCount; i++) stars.push(new Star());
+      for (let i = 0; i < 2; i++) meteors.push(new Meteor());
+      animate();
+    }
+    function animate() {
+      ctx.clearRect(0, 0, width, height);
+      stars.forEach(s => { s.update(); s.draw(); });
+      meteors.forEach(m => { m.update(); m.draw(); });
+      requestAnimationFrame(animate);
+    }
+    window.addEventListener('resize', resize); init();
+  }
+  const bgm = document.getElementById('bgm'), musicBtn = document.getElementById('music-player');
+  function toggleMusic() {
+    if (bgm.paused) { bgm.play().catch(e => console.log("Music failed:", e)); musicBtn.classList.remove('paused'); }
+    else { bgm.pause(); musicBtn.classList.add('paused'); }
+  }
+
+  /* =========================================
+     LOGIC 6: 最终页动画
+     ========================================= */
+  function triggerFinalAnimation() {
+      rainHearts();
+      showBlessings();
+      document.getElementById('final-button').style.display = 'none';
+  }
+  function createEffectCanvas() {
+      const canvas = document.createElement('canvas');
+      Object.assign(canvas.style, { position: 'fixed', top: '0', left: '0', width: '100%', height: '100%', pointerEvents: 'none', zIndex: '9999' });
+      document.body.appendChild(canvas);
+      canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+      return { canvas, ctx: canvas.getContext('2d') };
+  }
+  function rainHearts() {
+    const { canvas, ctx } = createEffectCanvas();
+    const symbols = ['❤️', '💖', '✨', '💕', '🥰'];
+    let particles = Array.from({length: 50}, () => ({
+        x: Math.random() * canvas.width, y: Math.random() * canvas.height - canvas.height,
+        speed: Math.random() * 2 + 1, size: Math.random() * 15 + 10,
+        char: symbols[Math.floor(Math.random() * symbols.length)],
+        opacity: Math.random() * 0.5 + 0.5
+    }));
+    let frameId;
+    function draw() {
+      ctx.clearRect(0,0,canvas.width, canvas.height);
+      particles.forEach(p => {
+        ctx.font = `${p.size}px serif`; ctx.globalAlpha = p.opacity;
+        ctx.fillText(p.char, p.x, p.y); p.y += p.speed;
+        if (p.y > canvas.height + 20) p.y = -20;
+      });
+      frameId = requestAnimationFrame(draw);
+    }
+    draw();
+    setTimeout(() => { cancelAnimationFrame(frameId); document.body.removeChild(canvas); }, 20000);
+  }
+  function showBlessings() {
+      const { canvas, ctx } = createEffectCanvas();
+      let blessings = config.blessings.map((text, i) => ({
+          text, x: canvas.width + i * 300,
+          y: Math.random() * (canvas.height - 80) + 40,
+          speed: Math.random() * 1 + 0.8,
+          size: Math.random() * 20 + 28
+      }));
+      let frameId;
+      function draw() {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          blessings.forEach(b => {
+              ctx.font = `bold ${b.size}px var(--font-main)`;
+              ctx.fillStyle = `rgba(255, 255, 255, 0.8)`;
+              ctx.fillText(b.text, b.x, b.y);
+              b.x -= b.speed;
+              if (b.x < -ctx.measureText(b.text).width) b.x = canvas.width;
+          });
+          frameId = requestAnimationFrame(draw);
+      }
+      draw();
+      setTimeout(() => { cancelAnimationFrame(frameId); document.body.removeChild(canvas); }, 25000);
+  }
+
+  const styleSheet = document.createElement("style");
+  styleSheet.innerText = `@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 50% { transform: translateX(10px); } 75% { transform: translateX(-10px); } }`;
+  document.head.appendChild(styleSheet);
+</script>
+
+</body>
+</html>
